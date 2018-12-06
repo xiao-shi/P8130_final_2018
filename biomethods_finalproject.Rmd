@@ -1,0 +1,91 @@
+---
+title: "biomethods_finalproject"
+author: "Xiao Shi"
+date: "December 5, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(dplyr)
+library(stringr)
+```
+
+read in the data
+```{r}
+cancer = read.csv("cancer.csv") %>%
+  janitor::clean_names()
+```
+divide into states/ into Bureau of Economic Analysis regions
+```{r}
+cancer$states = sub('.*,\\s*', '', cancer$geography)
+cancer$econ_region = ifelse(cancer$states == "Connecticut", "New England", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Maine", "New England", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Massachusetts", "New England", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "New Hampshire", "New England", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Rhode Island", "New England", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Vermont", "New England", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Delaware", "Mideast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "District of Columbia", "Mideast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Maryland", "Mideast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "New Jersey", "Mideast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "New York", "Mideast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Pennsylvania", "Mideast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Illinois", "Great Lakes", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Indiana", "Great Lakes", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Ohio", "Great Lakes", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Michigan", "Great Lakes", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Wisconsin", "Great Lakes", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Iowa", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Kansas", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Minnesoda", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Missouri", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Nebraska", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "North Dakota", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "South Dakota", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Alabama", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Arkansas", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Georgia", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Florida", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Kentucky", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Louisiana", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Mississippi", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "North Carolina", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "South Carolina", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Tennessee", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Virginia", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "West Virginia", "Southeast", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Oklahoma", "Southwest", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "New Mexico", "Southwest", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Arizona", "Southwest", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Texas", "Southwest", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Colorado", "Rocky Mountain", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Idaho", "Rocky Mountain", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Montana", "Rocky Mountain", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Utah", "Rocky Mountain", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Wyoming", "Rocky Mountain", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Alaska", "Far West", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "California", "Far West", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Hawaii", "Far West", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Nevada", "Far West", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Oregon", "Far West", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Washington", "Far West", cancer$econ_region) 
+
+
+```
+Variable selection based on the following literature:
+
+“It’s encouraging to see progress in decreasing death rates for many types of cancer,” said Betsy A. Kohler, executive director, NAACCR. “Yet the fact that death rates from several cancers are still on the rise means we need to keep working to find strategies to encourage prevention and continue to make improvements in screening and treatment.” [3]
+The above paragraph demonstrated the fact that some cancer see decreasing death rates while others increased.
+
+Factors such as Age, Alcohol, Cancer-Causing Substances, Chronic Inflammation, Diet, Hormones, Immunosuppression, Infectious Agents, Obesity, Radiation, Sunlight, Tobacco are the most-studied known or suspected risk factors for cancer. [4]
+
+"Cancer prevention requires smoking cessation, increased ingestion of fruits and vegetables, moderate use of alcohol, caloric restriction, exercise, avoidance of direct exposure to sunlight, minimal meat consumption, use of whole grains, use of vaccinations, and regular check-ups" [5]
+
+Reference:
+1. https://www.cancer.gov/about-cancer/understanding/disparities
+2. https://en.wikipedia.org/wiki/List_of_regions_of_the_United_States
+3. https://www.cancer.gov/news-events/press-releases/2018/annual-report-nation-2018
+4. https://www.cancer.gov/about-cancer/causes-prevention/risk
+5. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2515569/
