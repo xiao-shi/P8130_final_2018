@@ -1,0 +1,218 @@
+---
+title: "Biostat_Methods_Final_Project"
+output: pdf_document
+author: "Junyuan Zheng (jz3036)"
+date: 2018-12-07
+---
+
+Import packages:
+```{r import_packages, echo = FALSE, message = FALSE}
+library(tidyverse)
+library(glmnet) 
+#library(faraway)
+#library(broom)
+#library('leaps')
+#library(caret)
+#library(dplyr)
+#library(readxl)
+```
+
+=======================================================================================================
+
+# DATA Preprocessing
+
+Import original dataset:
+```{r import_data_p2, echo = FALSE, message = FALSE}
+data = read_csv(file='./Cancer_Registry.csv') %>% 
+  janitor::clean_names()
+```
+
+build 'region' variable from 'geography'. This is gonna be the only categorical variable in the dataset.
+```{r}
+data_pre = data %>% 
+separate(., geography, into = c('county', 'state'), sep = ', ') %>% 
+  mutate(., region = replace(state, state == 'Connecticut', 'Northeast'),
+            region = replace(region, region == 'Maine', 'Northeast'),
+            region = replace(region, region == 'Massachusetts', 'Northeast'),
+            region = replace(region, region == 'New Hampshire', 'Northeast'),
+            region = replace(region, region == 'Rhode Island', 'Northeast'),
+            region = replace(region, region == 'Vermont', 'Northeast'),
+            region = replace(region, region == 'New Jersey', 'Northeast'),
+            region = replace(region, region == 'New York', 'Northeast'),
+            region = replace(region, region == 'Pennsylvania', 'Northeast'),
+            region = replace(region, region == 'Indiana', 'Midwest'),
+            region = replace(region, region == 'Michigan', 'Midwest'),
+            region = replace(region, region == 'Illinois', 'Midwest'),
+            region = replace(region, region == 'Ohio', 'Midwest'),
+            region = replace(region, region == 'Wisconsin', 'Midwest'),
+            region = replace(region, region == 'Iowa', 'Midwest'),
+            region = replace(region, region == 'Kansas', 'Midwest'),
+            region = replace(region, region == 'Minnesota', 'Midwest'),
+            region = replace(region, region == 'Missouri', 'Midwest'),
+            region = replace(region, region == 'Nebraska', 'Midwest'),
+            region = replace(region, region == 'North Dakota', 'Midwest'),
+            region = replace(region, region == 'South Dakota', 'Midwest'),
+            region = replace(region, region == 'Delaware', 'South'),
+            region = replace(region, region == 'Florida', 'South'),
+            region = replace(region, region == 'Georgia', 'South'),
+            region = replace(region, region == 'Maryland', 'South'),
+            region = replace(region, region == 'North Carolina', 'South'),
+            region = replace(region, region == 'South Carolina', 'South'),
+            region = replace(region, region == 'Virginia', 'South'),
+            region = replace(region, region == 'District of Columbia', 'South'),
+            region = replace(region, region == 'West Virginia', 'South'),
+            region = replace(region, region == 'Alabama', 'South'),
+            region = replace(region, region == 'Kentucky', 'South'),
+            region = replace(region, region == 'Mississippi', 'South'),
+            region = replace(region, region == 'Tennessee', 'South'),
+            region = replace(region, region == 'Arkansas', 'South'),
+            region = replace(region, region == 'Louisiana', 'South'),
+            region = replace(region, region == 'Oklahoma', 'South'),
+            region = replace(region, region == 'Texas', 'South'),
+            region = replace(region, region == 'Arizona', 'West'),
+            region = replace(region, region == 'Colorado', 'West'),
+            region = replace(region, region == 'Idaho', 'West'),
+            region = replace(region, region == 'Montana', 'West'),
+            region = replace(region, region == 'Nevada', 'West'),
+            region = replace(region, region == 'New Mexico', 'West'),
+            region = replace(region, region == 'Utah', 'West'),
+            region = replace(region, region == 'Wyoming', 'West'),
+            region = replace(region, region == 'Alaska', 'West'),
+            region = replace(region, region == 'California', 'West'),
+            region = replace(region, region == 'Hawaii', 'West'),
+            region = replace(region, region == 'Oregon', 'West'),
+            region = replace(region, region == 'Washington', 'West'))
+```
+
+
+There are 3 variables that has missing data in the original dataset: 'pct_some_col18_24', 'pct_employed16_over', 'pct_private_coverage_alone'. Since 'pct_no_hs18_24', 'pct_some_col18_24', 'pct_hs18_24', and 'pct_bach_deg18_24' together equals 100, here I re-calculate the 'pct_some_col18_24' variable so that it would not contain missing data anymore.
+```{r}
+data_pre = 
+  mutate(data_pre, pct_some_col18_24 = 100 - (pct_no_hs18_24 + pct_hs18_24 + pct_bach_deg18_24))
+```
+
+=======================================================================================================
+
+# Variable Selection (before putting variables into the model)
+
+Things being considered under this section: \
+(1) Checking collinearity for the continuous variables (using 0.7 as rule of thumb). \
+(2) complete variable over variable with missing data. \
+(3) Practical importance. \
+(4) Real life situation. \
+(5) Not to eliminate too many variables for later model building (LASSO, Automatic selection). \
+
+```{r eval = FALSE, message = FALSE}
+data_pre %>%
+  select(., -'binned_inc', -'county', -'state', -'region') %>% 
+  cor(., use='complete.obs')
+```
+
+## decision reasoning for this part:
+__Decision 1: not to use 'avg_deaths_per_year' variable.__ \
+Reasoning: 'avg_deaths_per_year', 'avg_ann_count', and 'pop_est2015' appear to be correlated. First of all, it's not hard for local government to have access to all the three variables, so it's probably better to keep them all for now. However, since we are predicting the Death Rate, having both 'avg_deaths_per_year' and 'pop_est2015' available seems a little bit weird because we can probably just calculate the true Death Rate. Since population is a more common variable to have access to, I would not be using 'avg_deaths_per_year' during nest step. \
+
+__Decision 2: keeping the 'median_age_male', 'median_age_female' pair, as well as the 'pct_white', 'pct_black' pair even they are correlated.__ \
+Reasoning: For practical importance, all of the four variables are common and what people are care about. \
+
+__Decision 3: not to use 'binned_inc'.__
+Reasoning: 'binned_inc' is the median income binned by decile, there is 10 distinct range for this variable, which means we can potentially make it to be a categorical data. However, this categorial variable might be complicated to interpret. Instead, I choose to use the continuous variable 'med_income' who is correlated to 'binned_inc'. \
+
+__Decision 4: not to used 'pct_married_households'__
+Reasoning: 'pct_married_households' and 'percent_married' are correlated, while 'percent_married' is more accessible. \
+
+__Decision 5: keep a 'correlation network' of variables__
+Reasoning: When looking at which variables are correlated, there is a group of variables, roughly including 'poverty_percent', 'med_income', the education_related variables,the employment_related variables, and the health coverage_related variables, that are somewhat correlated. I don't want to eliminate any of them just yet because, first of all, it's hard to decide which severals to keep, and secondly, I can live them for latter model building using LASSO or automatic selection method. \
+
+__Decision 6: not to use 'pct_employed16_over' and 'pct_private_coverage_alone' with missing data.__
+Reasoning: I didn't come up with some way to makeup of those missing data. If using this two variable, a lot of observations would not be able to fit in the model, therefore wasting some of the information. Also, since the two variables are somewhat correlated to other variables, I'm not too worried about missing those infomation.
+
+## Conclusion:
+__Variables not gonna be used before model selection:__ \
+'avg_deaths_per_year', 'binned_inc', 'pct_married_households', 'pct_employed16_over', 'pct_private_coverage_alone'.
+
+Dataset after variable pre-selection:
+```{r}
+data_vrb_pre_selec = data_pre %>%
+  select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households',
+            -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')
+```
+
+=======================================================================================================
+
+# Model Selection
+
+## LASSO
+```{r}
+set.seed(1)
+data_vrb_pre_selec_df = data.frame(data_vrb_pre_selec)
+
+Y = data_vrb_pre_selec_df[,2]
+X = model.matrix(target_death_rate ~ ., data=data_vrb_pre_selec_df) # 'region' into dummy variable.
+
+train = sample(1:nrow(X),nrow(X)*0.7)
+
+cv.out = cv.glmnet(X[train,],Y[train])
+#plot(cv.out)
+best.lambda = cv.out$lambda.min
+
+lasso2 = glmnet(X, Y, alpha=1, lambda=best.lambda)
+coef(lasso2)
+```
+
+## Automatic Procedures
+
+### Backward Elimination
+
+```{r}
+mult.fit_BW = lm(target_death_rate ~ ., data=data_vrb_pre_selec)
+summary(mult.fit_BW)
+
+step1 = update(mult.fit_BW, . ~ . -pct_bach_deg18_24)
+summary(step1)
+
+step2 = update(step1, . ~ . -study_per_cap)
+summary(step2)
+
+step3 = update(step2, . ~ . -med_income)
+summary(step3)
+
+step4 = update(step3, . ~ . -median_age)
+summary(step4)
+
+step5 = update(step4, . ~ . -pct_public_coverage_alone)
+summary(step5)
+
+step6 = update(step5, . ~ . -pct_asian)
+summary(step6)
+
+step7 = update(step6, . ~ . -pct_some_col18_24)
+summary(step7)
+
+step8 = update(step7, . ~ . -median_age_male)
+summary(step8)
+
+step9 = update(step8, . ~ . -avg_household_size)
+summary(step9)
+
+step10 = update(step9, . ~ . -pop_est2015)
+summary(step10)
+
+step11 = update(step10, . ~ . -avg_ann_count)
+summary(step11)
+
+step12 = update(step11, . ~ . -pct_no_hs18_24)
+summary(step12)
+```
+
+### Stepwise Regression
+
+```{r}
+mult.fit_SW = lm(target_death_rate ~ ., data=data_vrb_pre_selec)
+step(mult.fit_SW, direction='backward')
+```
+
+
+
+
+
