@@ -1,0 +1,11 @@
+---
+title: "Diagnose"
+author: "Catherine"
+date: "12/9/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
