@@ -16,6 +16,7 @@ read in the data
 ```{r}
 cancer = read.csv("cancer.csv") %>%
   janitor::clean_names()
+summary(cancer)
 ```
 divide into states/ into Bureau of Economic Analysis regions
 ```{r}
@@ -81,11 +82,13 @@ The above paragraph demonstrated the fact that some cancer see decreasing death 
 
 Factors such as Age, Alcohol, Cancer-Causing Substances, Chronic Inflammation, Diet, Hormones, Immunosuppression, Infectious Agents, Obesity, Radiation, Sunlight, Tobacco are the most-studied known or suspected risk factors for cancer. [4]
 
-"Cancer prevention requires smoking cessation, increased ingestion of fruits and vegetables, moderate use of alcohol, caloric restriction, exercise, avoidance of direct exposure to sunlight, minimal meat consumption, use of whole grains, use of vaccinations, and regular check-ups" [5]
+including income level"Cancer prevention requires smoking cessation, increased ingestion of fruits and vegetables, moderate use of alcohol, caloric restriction, exercise, avoidance of direct exposure to sunlight, minimal meat consumption, use of whole grains, use of vaccinations, and regular check-ups" [5]
 
+including `marriage status`: "Extensive research has demonstrated that marriage and parenting are associated with lower testosterone levels in men, however, very little is known about associations with hormone concentrations in women. Here, we examine estradiol and progesterone concentrations in relation to marriage and motherhood in naturally cycling, reproductive age women." [6]
 Reference:
 1. https://www.cancer.gov/about-cancer/understanding/disparities
 2. https://en.wikipedia.org/wiki/List_of_regions_of_the_United_States
 3. https://www.cancer.gov/news-events/press-releases/2018/annual-report-nation-2018
 4. https://www.cancer.gov/about-cancer/causes-prevention/risk
 5. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2515569/
+6. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5501487/

@@ -1,8 +1,10 @@
 ---
 title: "Biostat_Methods_Final_Project"
-output: pdf_document
 author: "Junyuan Zheng (jz3036)"
-date: 2018-12-07
+date: '2018-12-07'
+output:
+  html_document:
+    df_print: paged
 ---
 
 Import packages:
