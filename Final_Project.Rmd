@@ -1,16 +1,15 @@
 ---
 title: "Biostat_Methods_Final_Project"
+output: pdf_document
 author: "Junyuan Zheng (jz3036)"
-date: '2018-12-07'
-output:
-  html_document:
-    df_print: paged
+date: 2018-12-07
 ---
 
 Import packages:
 ```{r import_packages, echo = FALSE, message = FALSE}
 library(tidyverse)
-library(glmnet) 
+library(glmnet)
+library('leaps')
 #library(faraway)
 #library(broom)
 #library('leaps')
@@ -152,7 +151,7 @@ data_vrb_pre_selec_df = data.frame(data_vrb_pre_selec)
 Y = data_vrb_pre_selec_df[,2]
 X = model.matrix(target_death_rate ~ ., data=data_vrb_pre_selec_df) # 'region' into dummy variable.
 
-train = sample(1:nrow(X),nrow(X)*0.7)
+train = sample(1:nrow(X),nrow(X)*0.8)
 
 cv.out = cv.glmnet(X[train,],Y[train])
 #plot(cv.out)
@@ -161,6 +160,8 @@ best.lambda = cv.out$lambda.min
 lasso2 = glmnet(X, Y, alpha=1, lambda=best.lambda)
 coef(lasso2)
 ```
+
+Using LASSO, the coefficient of 'med_income', 'pop_est2015', 'study_per_cap', 'median_age' and 'pct_some_col18_24' became 0. Those variables can potentially be eliminated from our model.
 
 ## Automatic Procedures
 
@@ -207,14 +208,86 @@ step12 = update(step11, . ~ . -pct_no_hs18_24)
 summary(step12)
 ```
 
+Using backward selection, 'pct_bach_deg18_24', 'study_per_cap', 'med_income', 'median_age', 'pct_public_coverage_alone', 'pct_asian', 'pct_some_col18_24', 'median_age_male', 'avg_household_size', 'pop_est2015', 'avg_ann_count', and 'pct_no_hs18_24' were eliminated from the model.
+
+lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec)
+
 ### Stepwise Regression
 
 ```{r}
 mult.fit_SW = lm(target_death_rate ~ ., data=data_vrb_pre_selec)
 step(mult.fit_SW, direction='backward')
 ```
+stepwise: 19 variables.
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
+    pop_est2015 + poverty_percent + median_age_female + percent_married + 
+    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
+    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
+    pct_public_coverage + pct_white + pct_black + pct_other_race + 
+    birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+
+avg_ann_count, pop_est2015, pct_no_hs18_24
+
+backwards: 16 variables.
+lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+
+## criterion-based procedures
+
+### Cp
+
+```{r}
+data_frame = data.frame(data_vrb_pre_selec)
+leaps(x = data_frame[,c('avg_ann_count','incidence_rate','med_income','pop_est2015','poverty_percent','study_per_cap','median_age','median_age_male','median_age_female','avg_household_size','percent_married','pct_no_hs18_24','pct_hs18_24','pct_some_col18_24','pct_hs25_over','pct_bach_deg25_over','pct_unemployed16_over','pct_private_coverage','pct_emp_priv_coverage','pct_public_coverage','pct_public_coverage_alone','pct_white','pct_black','pct_asian','pct_other_race','birth_rate')], y = data_frame[,2], nbest=1, method='Cp')
+```
+
+Including 'pct_bach_deg18_24' doesn't work for the function.
+
+Suggested: 16 variables.
+'avg_ann_count','incidence_rate','pop_est2015','poverty_percent', 'median_age_male', 'pct_no_hs18_24','pct_hs18_24', 'pct_hs25_over','pct_bach_deg25_over','pct_unemployed16_over','pct_private_coverage','pct_emp_priv_coverage','pct_public_coverage','pct_white','pct_other_race','birth_rate'.
 
 
+### adjr2:
 
+```{r}
+leaps(x = data_frame[,c('avg_ann_count','incidence_rate','med_income','pop_est2015','poverty_percent','study_per_cap','median_age','median_age_male','median_age_female','avg_household_size','percent_married','pct_no_hs18_24','pct_hs18_24','pct_some_col18_24','pct_hs25_over','pct_bach_deg25_over','pct_unemployed16_over','pct_private_coverage','pct_emp_priv_coverage','pct_public_coverage','pct_public_coverage_alone','pct_white','pct_black','pct_asian','pct_other_race','birth_rate')], y = data_frame[,2], nbest=1, method='adjr2')
+```
+ 
+The Adjusted R^2 are very similar, doesn't give too much information for model selection.
+ 
+## Summary
 
+backwards: 16 variables.
+lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+    
+stepwise: 19 variables.
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
+    pop_est2015 + poverty_percent + median_age_female + percent_married + 
+    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
+    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
+    pct_public_coverage + pct_white + pct_black + pct_other_race + 
+    birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+    
+Cp: 16 variables.
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + pop_est2015 + poverty_percent + 
+    median_age_male + pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over +
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_other_race + birth_rate, data = data_vrb_pre_selec) %>% 
+    summary()
 
