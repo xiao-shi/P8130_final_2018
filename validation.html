@@ -344,13 +344,16 @@ for(i in 1:10){
                    trControl=data_train,
                    method='lm',
                    na.action=na.pass)
-  MSE = mean(model_caret$resample$RMSE)
+  
+  MSE = (model_caret$resample$RMSE)^2
+  
+  mean_mse_cv = mean(MSE)
 
-  mean_mse_cv = mean_mse_cv + MSE/10
+  mean_mse_cv = mean_mse_cv + mean_mse_cv/10
 }
 
 (mean_mse_cv)</code></pre>
-<pre><code>## [1] 19.08077</code></pre>
+<pre><code>## [1] 401.8169</code></pre>
 </div>
 
 
