@@ -1,0 +1,147 @@
+---
+title: "Validation"
+author: "Baoyi Shi"
+output: html_document
+---
+```{r import_packages, echo = FALSE, message = FALSE}
+library(tidyverse)
+library('leaps')
+library(faraway)
+library(broom)
+library('leaps')
+library(caret)
+library(dplyr)
+library(readxl)
+```
+
+
+=======================================================================================================
+
+# DATA Preprocessing
+
+Import original dataset:
+```{r import_data_p2, echo = FALSE, message = FALSE}
+data = read_csv(file='./Cancer_Registry.csv') %>% 
+  janitor::clean_names()
+```
+
+build 'region' variable from 'geography'. This is gonna be the only categorical variable in the dataset.
+```{r}
+data_pre = data %>% 
+separate(., geography, into = c('county', 'state'), sep = ', ') %>% 
+  mutate(., region = replace(state, state == 'Connecticut', 'Northeast'),
+            region = replace(region, region == 'Maine', 'Northeast'),
+            region = replace(region, region == 'Massachusetts', 'Northeast'),
+            region = replace(region, region == 'New Hampshire', 'Northeast'),
+            region = replace(region, region == 'Rhode Island', 'Northeast'),
+            region = replace(region, region == 'Vermont', 'Northeast'),
+            region = replace(region, region == 'New Jersey', 'Northeast'),
+            region = replace(region, region == 'New York', 'Northeast'),
+            region = replace(region, region == 'Pennsylvania', 'Northeast'),
+            region = replace(region, region == 'Indiana', 'Midwest'),
+            region = replace(region, region == 'Michigan', 'Midwest'),
+            region = replace(region, region == 'Illinois', 'Midwest'),
+            region = replace(region, region == 'Ohio', 'Midwest'),
+            region = replace(region, region == 'Wisconsin', 'Midwest'),
+            region = replace(region, region == 'Iowa', 'Midwest'),
+            region = replace(region, region == 'Kansas', 'Midwest'),
+            region = replace(region, region == 'Minnesota', 'Midwest'),
+            region = replace(region, region == 'Missouri', 'Midwest'),
+            region = replace(region, region == 'Nebraska', 'Midwest'),
+            region = replace(region, region == 'North Dakota', 'Midwest'),
+            region = replace(region, region == 'South Dakota', 'Midwest'),
+            region = replace(region, region == 'Delaware', 'South'),
+            region = replace(region, region == 'Florida', 'South'),
+            region = replace(region, region == 'Georgia', 'South'),
+            region = replace(region, region == 'Maryland', 'South'),
+            region = replace(region, region == 'North Carolina', 'South'),
+            region = replace(region, region == 'South Carolina', 'South'),
+            region = replace(region, region == 'Virginia', 'South'),
+            region = replace(region, region == 'District of Columbia', 'South'),
+            region = replace(region, region == 'West Virginia', 'South'),
+            region = replace(region, region == 'Alabama', 'South'),
+            region = replace(region, region == 'Kentucky', 'South'),
+            region = replace(region, region == 'Mississippi', 'South'),
+            region = replace(region, region == 'Tennessee', 'South'),
+            region = replace(region, region == 'Arkansas', 'South'),
+            region = replace(region, region == 'Louisiana', 'South'),
+            region = replace(region, region == 'Oklahoma', 'South'),
+            region = replace(region, region == 'Texas', 'South'),
+            region = replace(region, region == 'Arizona', 'West'),
+            region = replace(region, region == 'Colorado', 'West'),
+            region = replace(region, region == 'Idaho', 'West'),
+            region = replace(region, region == 'Montana', 'West'),
+            region = replace(region, region == 'Nevada', 'West'),
+            region = replace(region, region == 'New Mexico', 'West'),
+            region = replace(region, region == 'Utah', 'West'),
+            region = replace(region, region == 'Wyoming', 'West'),
+            region = replace(region, region == 'Alaska', 'West'),
+            region = replace(region, region == 'California', 'West'),
+            region = replace(region, region == 'Hawaii', 'West'),
+            region = replace(region, region == 'Oregon', 'West'),
+            region = replace(region, region == 'Washington', 'West'))
+```
+
+
+There are 3 variables that has missing data in the original dataset: 'pct_some_col18_24', 'pct_employed16_over', 'pct_private_coverage_alone'. Since 'pct_no_hs18_24', 'pct_some_col18_24', 'pct_hs18_24', and 'pct_bach_deg18_24' together equals 100, here I re-calculate the 'pct_some_col18_24' variable so that it would not contain missing data anymore.
+
+```{r}
+data_pre = 
+  mutate(data_pre, pct_some_col18_24 = 100 - (pct_no_hs18_24 + pct_hs18_24 + pct_bach_deg18_24))
+```
+
+Dataset after variable pre-selection:
+```{r}
+data_vrb_pre_selec = data_pre %>%
+  select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households',
+            -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')
+```
+
+
+```{r }
+#backwards: 16 variables.
+lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+    
+#stepwise: 19 variables.
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
+    pop_est2015 + poverty_percent + median_age_female + percent_married + 
+    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
+    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
+    pct_public_coverage + pct_white + pct_black + pct_other_race + 
+    birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+    
+#Cp: 16 variables.
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + pop_est2015 + poverty_percent + 
+    median_age_male + pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over +
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_other_race + birth_rate, data = data_vrb_pre_selec) %>% 
+    summary()
+```
+
+CV,repeat 10 times
+```{r }
+mean_mse_cv = 0
+
+for(i in 1:10){
+  data_train<-trainControl(method="cv", number=10)
+
+  model_caret<-train(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + pct_public_coverage + pct_white + pct_black + pct_other_race + birth_rate + region, 
+                   data = data_vrb_pre_selec,
+                   trControl=data_train,
+                   method='lm',
+                   na.action=na.pass)
+  MSE = mean(model_caret$resample$RMSE)
+
+  mean_mse_cv = mean_mse_cv + MSE/10
+}
+
+(mean_mse_cv)
+```
+
