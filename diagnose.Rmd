@@ -6,6 +6,188 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
+
+# fit a model for diagnose
+
+# DATA Preprocessing
+
+Import original dataset:
+```{r import_data_p2, echo = FALSE, message = FALSE}
+data = read_csv(file='./Cancer_Registry.csv') %>% 
+  janitor::clean_names()
+```
+
+build 'region' variable from 'geography'. This is gonna be the only categorical variable in the dataset.
+```{r include = FALSE}
+data_pre = data %>% 
+separate(., geography, into = c('county', 'state'), sep = ', ') %>% 
+  mutate(., region = replace(state, state == 'Connecticut', 'Northeast'),
+            region = replace(region, region == 'Maine', 'Northeast'),
+            region = replace(region, region == 'Massachusetts', 'Northeast'),
+            region = replace(region, region == 'New Hampshire', 'Northeast'),
+            region = replace(region, region == 'Rhode Island', 'Northeast'),
+            region = replace(region, region == 'Vermont', 'Northeast'),
+            region = replace(region, region == 'New Jersey', 'Northeast'),
+            region = replace(region, region == 'New York', 'Northeast'),
+            region = replace(region, region == 'Pennsylvania', 'Northeast'),
+            region = replace(region, region == 'Indiana', 'Midwest'),
+            region = replace(region, region == 'Michigan', 'Midwest'),
+            region = replace(region, region == 'Illinois', 'Midwest'),
+            region = replace(region, region == 'Ohio', 'Midwest'),
+            region = replace(region, region == 'Wisconsin', 'Midwest'),
+            region = replace(region, region == 'Iowa', 'Midwest'),
+            region = replace(region, region == 'Kansas', 'Midwest'),
+            region = replace(region, region == 'Minnesota', 'Midwest'),
+            region = replace(region, region == 'Missouri', 'Midwest'),
+            region = replace(region, region == 'Nebraska', 'Midwest'),
+            region = replace(region, region == 'North Dakota', 'Midwest'),
+            region = replace(region, region == 'South Dakota', 'Midwest'),
+            region = replace(region, region == 'Delaware', 'South'),
+            region = replace(region, region == 'Florida', 'South'),
+            region = replace(region, region == 'Georgia', 'South'),
+            region = replace(region, region == 'Maryland', 'South'),
+            region = replace(region, region == 'North Carolina', 'South'),
+            region = replace(region, region == 'South Carolina', 'South'),
+            region = replace(region, region == 'Virginia', 'South'),
+            region = replace(region, region == 'District of Columbia', 'South'),
+            region = replace(region, region == 'West Virginia', 'South'),
+            region = replace(region, region == 'Alabama', 'South'),
+            region = replace(region, region == 'Kentucky', 'South'),
+            region = replace(region, region == 'Mississippi', 'South'),
+            region = replace(region, region == 'Tennessee', 'South'),
+            region = replace(region, region == 'Arkansas', 'South'),
+            region = replace(region, region == 'Louisiana', 'South'),
+            region = replace(region, region == 'Oklahoma', 'South'),
+            region = replace(region, region == 'Texas', 'South'),
+            region = replace(region, region == 'Arizona', 'West'),
+            region = replace(region, region == 'Colorado', 'West'),
+            region = replace(region, region == 'Idaho', 'West'),
+            region = replace(region, region == 'Montana', 'West'),
+            region = replace(region, region == 'Nevada', 'West'),
+            region = replace(region, region == 'New Mexico', 'West'),
+            region = replace(region, region == 'Utah', 'West'),
+            region = replace(region, region == 'Wyoming', 'West'),
+            region = replace(region, region == 'Alaska', 'West'),
+            region = replace(region, region == 'California', 'West'),
+            region = replace(region, region == 'Hawaii', 'West'),
+            region = replace(region, region == 'Oregon', 'West'),
+            region = replace(region, region == 'Washington', 'West'))
+```
+
+```{r include = FALSE}
+data_pre = 
+  mutate(data_pre, pct_some_col18_24 = 100 - (pct_no_hs18_24 + pct_hs18_24 + pct_bach_deg18_24))
+```
+
+```{r include = FALSE}
+data_vrb_pre_selec = data_pre %>%
+  select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households', -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')
+```
+
+```{r}
+final_fit = lm(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec) 
+```
+
+
+# plot the regression model
+```{r}
+par(mfrow = c(2,2))
+plot(final_fit)
+```
+__Comment__
+
+
+__Detect outliers in Y using ‘studentized residuals’__
+
+```{r}
+sr = rstandard(final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
+outlier_y = sr %>% filter(abs(value) > 2.5) 
+names(outlier_y) = c("over_2.5", "observation_n") 
+knitr::kable(outlier_y, caption = "Outliers of y")
+```
+
+__Comment__
+
+There are __78__ ouliers in Y being detected. 
+
+__Detect outliners in X using Leverage values__
+
+```{r}
+fit_hat = hatvalues(final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
+outlier_x_moderate = fit_hat %>% filter(abs(value) > 0.2) 
+outlier_x_high = fit_hat %>% filter(abs(value) > 0.5)
+names(outlier_x_moderate) = c("over_0.2", "observation_n") 
+names(outlier_x_high) = c("over_0.5", "observation_n")
+knitr::kable(outlier_x_moderate, caption = "Outliers of X (> 0.2)")
+knitr::kable(outlier_x_high, caption = "Outliers of X (> 2p/n)")
+```
+
+__Comment__
+
+By taking look at the $h_{ii}$ values, we detect one observations with $h_{ii} > 0.2$, which is `1000`. We no observation with $h_{ii} > 0.5$.
+
+__Influencial Observation__
+
+Not all outliers are influential. Therefore, we need to test the influence of the outliers. 
+Using DFFITS test the difference of fitted value with/without an observation and Cook's Distance to find concerned values.
+
+```{r}
+tb = influence.measures(final_fit)[["infmat"]] %>% as_tibble() %>% 
+  mutate(n = 1:3047) %>% 
+  select(dffit, cook.d, n) %>% 
+  filter(abs(dffit)>1|abs(cook.d)>0.5)
+knitr::kable(tb, caption = "Influential observation")
+```
+
+__Comment__
+
+Consider `DFFITS` and `Cook's Distance`, we found out an influencitial outlier `282`. The difference is large between fitted value with/without `282` observation. Next, we can take a look at the change of fitted value with/without `282`.
+
+```{r}
+without282 = data_vrb_pre_selec[-282,]
+fit_with282 = lm(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec)
+fit_without282 = lm(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = without282)
+
+sum1 = summary(fit_with282)$coef 
+sum2 = summary(fit_without282)$coef
+
+knitr::kable(sum1, caption = "Model with observation 282")
+knitr::kable(sum2, caption = "Model without observation 282")
+
+(sum1[2]-sum2[2])/sum1[2]
+(sum1[3]-sum2[3])/sum1[3]
+(sum1[4]-sum2[4])/sum1[4]
+```
+
+__Comment__
+
+After calculating the coefficient changes for each variables, we found that the changes are significant for `  `.
+
+
+```{r fig.height=6}
+fit_without282 = lm(target_death_rate ~ avg_ann_count + incidence_rate + 
+    pop_est2015 + poverty_percent + median_age_female + percent_married + 
+    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
+    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
+    pct_public_coverage + pct_white + pct_black + pct_other_race + 
+    birth_rate + region, data = without282)
+
+par(mfrow = c(2,2))
+plot(fit_without282)
+```
+
+__Comment__
+
+In the _Residuals vs Fitted Plot_ and _Scale-Location Plot_, 
+
+In the _Quantile–Quantile Plot_, 
+
+In the _Residuals vs Leverage Plot_, 
+
+
+__Multicolinearity__
+
+
 
