@@ -40,7 +40,7 @@ cancer$econ_region = ifelse(cancer$states == "Michigan", "Great Lakes", cancer$e
 cancer$econ_region = ifelse(cancer$states == "Wisconsin", "Great Lakes", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "Iowa", "Plains", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "Kansas", "Plains", cancer$econ_region) 
-cancer$econ_region = ifelse(cancer$states == "Minnesoda", "Plains", cancer$econ_region) 
+cancer$econ_region = ifelse(cancer$states == "Minnesota", "Plains", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "Missouri", "Plains", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "Nebraska", "Plains", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "North Dakota", "Plains", cancer$econ_region) 
