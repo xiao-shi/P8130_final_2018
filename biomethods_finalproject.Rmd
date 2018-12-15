@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(readxl)
 library(dplyr)
 library(stringr)
+library(ggplot2)
 ```
 
 read in the data
@@ -21,7 +22,8 @@ summary(cancer)
 divide into states/ into Bureau of Economic Analysis regions
 ```{r}
 cancer$states = sub('.*,\\s*', '', cancer$geography)
-cancer$econ_region = ifelse(cancer$states == "Connecticut", "New England", cancer$econ_region) 
+
+cancer$econ_region = ifelse(cancer$states == "Connecticut", "New England", NA) 
 cancer$econ_region = ifelse(cancer$states == "Maine", "New England", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "Massachusetts", "New England", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "New Hampshire", "New England", cancer$econ_region) 
@@ -73,6 +75,17 @@ cancer$econ_region = ifelse(cancer$states == "Nevada", "Far West", cancer$econ_r
 cancer$econ_region = ifelse(cancer$states == "Oregon", "Far West", cancer$econ_region) 
 cancer$econ_region = ifelse(cancer$states == "Washington", "Far West", cancer$econ_region) 
 
+
+```
+
+```{r}
+cancer %>%
+  group_by(econ_region) %>%
+  summarise(mean_death_rate = mean(target_death_rate)) %>%
+  knitr::kable()
+
+ggplot() +
+  geom_point(aes(x = econ_region, y = target_death_rate, color = econ_region), data = cancer) 
 
 ```
 Variable selection based on the following literature:

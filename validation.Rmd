@@ -97,33 +97,17 @@ data_vrb_pre_selec = data_pre %>%
             -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')
 ```
 
+```{r}
+final_model = lm(formula = target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
+     region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage,
+     data = data_vrb_pre_selec) %>%
+  summary(.)
 
-```{r }
-#backwards: 16 variables.
-lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
-    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
-    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
-    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
-    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec) %>% 
-    summary()
-    
-#stepwise: 19 variables.
-lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
-    pop_est2015 + poverty_percent + median_age_female + percent_married + 
-    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
-    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
-    pct_public_coverage + pct_white + pct_black + pct_other_race + 
-    birth_rate + region, data = data_vrb_pre_selec) %>% 
-    summary()
-    
-#Cp: 16 variables.
-lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + pop_est2015 + poverty_percent + 
-    median_age_male + pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over +
-    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
-    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
-    pct_other_race + birth_rate, data = data_vrb_pre_selec) %>% 
-    summary()
+final_mse = (final_model$sigma)^2
+
+(final_mse)
 ```
+
 
 CV,repeat 10 times
 ```{r }
@@ -132,7 +116,8 @@ mean_mse_cv = 0
 for(i in 1:10){
   data_train<-trainControl(method="cv", number=10)
 
-  model_caret<-train(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + pct_public_coverage + pct_white + pct_black + pct_other_race + birth_rate + region, 
+  model_caret<-train(target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
+     region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, 
                    data = data_vrb_pre_selec,
                    trControl=data_train,
                    method='lm',
@@ -146,3 +131,4 @@ for(i in 1:10){
 (mean_mse_cv)
 ```
 
+Test MSE is similar to the MSE of our final model, so the predictive ability of our model is good.
