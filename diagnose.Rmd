@@ -2,11 +2,15 @@
 title: "Diagnose"
 author: "Catherine"
 date: "12/9/2018"
-output: html_document
+output: 
+  pdf_document:
+    latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(patchwork)
+library(HH)
 ```
 
 # fit a model for diagnose
@@ -14,8 +18,8 @@ library(tidyverse)
 # DATA Preprocessing
 
 Import original dataset:
-```{r import_data_p2, echo = FALSE, message = FALSE}
-data = read_csv(file='./Cancer_Registry.csv') %>% 
+```{r import_data_p2, include = FALSE, message = FALSE}
+data = read_csv(file = './Cancer_Registry.csv') %>% 
   janitor::clean_names()
 ```
 
@@ -83,26 +87,75 @@ data_pre =
 
 ```{r include = FALSE}
 data_vrb_pre_selec = data_pre %>%
-  select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households', -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')
+  dplyr::select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households', -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')
 ```
+
+## The model we got from model selection is 
+
+`target_death_rate ~ incidence_rate + poverty_percent + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec`
 
 ```{r}
 final_fit = lm(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec) 
 ```
 
+# Then we take a look at the histogram of varibles
 
-# plot the regression model
-```{r}
-par(mfrow = c(2,2))
-plot(final_fit)
+```{r histogram, include = FALSE}
+p = data_vrb_pre_selec %>% 
+  ggplot(aes(target_death_rate)) + geom_histogram()
+
+p1 = data_vrb_pre_selec %>% 
+  ggplot(aes(poverty_percent)) + geom_histogram()
+
+p2 = data_vrb_pre_selec %>% 
+  ggplot(aes(median_age_female)) + geom_histogram()
+
+p3 = data_vrb_pre_selec %>% 
+  ggplot(aes(pct_hs18_24)) + geom_histogram()
+
+p4 = data_vrb_pre_selec %>% 
+  ggplot(aes(pct_hs25_over)) + geom_histogram()
+
+p5 = data_vrb_pre_selec %>% 
+  ggplot(aes(pct_unemployed16_over)) + geom_histogram()
+
+p6 = data_vrb_pre_selec %>% 
+  ggplot(aes(pct_public_coverage)) + geom_histogram()
+
+p7 = data_vrb_pre_selec %>% 
+  ggplot(aes(incidence_rate)) + geom_histogram()
+
+p
+
+(p1 + p2 + p3) / (p4 + p5 + p6)
+
+t1 = data_vrb_pre_selec %>% 
+  ggplot(aes(log(poverty_percent))) + geom_histogram()
+
+t1 + p1
 ```
+
+```{r transformation}
+log_final_fit = lm(target_death_rate ~ incidence_rate + log(poverty_percent) + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec) 
+```
+
 __Comment__
 
+We found that `poverty_percent` is right-skewed so we decided to do transformation for this variable. 
 
-__Detect outliers in Y using ‘studentized residuals’__
+We got our model after transformation: `target_death_rate ~ incidence_rate + log(poverty_percent) + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage`
+
+# plot the regression model
 
 ```{r}
-sr = rstandard(final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
+par(mfrow = c(2,2))
+plot(log_final_fit)
+```
+
+# Detect outliers in Y using ‘studentized residuals’
+
+```{r}
+sr = rstandard(log_final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
 outlier_y = sr %>% filter(abs(value) > 2.5) 
 names(outlier_y) = c("over_2.5", "observation_n") 
 knitr::kable(outlier_y, caption = "Outliers of y")
@@ -110,12 +163,12 @@ knitr::kable(outlier_y, caption = "Outliers of y")
 
 __Comment__
 
-There are __78__ ouliers in Y being detected. 
+There are __70__ ouliers in Y being detected. 
 
-__Detect outliners in X using Leverage values__
+# Detect outliners in X using Leverage values
 
 ```{r}
-fit_hat = hatvalues(final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
+fit_hat = hatvalues(log_final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
 outlier_x_moderate = fit_hat %>% filter(abs(value) > 0.2) 
 outlier_x_high = fit_hat %>% filter(abs(value) > 0.5)
 names(outlier_x_moderate) = c("over_0.2", "observation_n") 
@@ -126,15 +179,15 @@ knitr::kable(outlier_x_high, caption = "Outliers of X (> 2p/n)")
 
 __Comment__
 
-By taking look at the $h_{ii}$ values, we detect one observations with $h_{ii} > 0.2$, which is `1000`. We no observation with $h_{ii} > 0.5$.
+By taking look at the $h_{ii}$ values, we detect __no oulier in X__ with both cutoff $h_{ii} > 0.2$ and cutoff $h_{ii} > 0.5$.
 
-__Influencial Observation__
+# Influencial Observation
 
 Not all outliers are influential. Therefore, we need to test the influence of the outliers. 
 Using DFFITS test the difference of fitted value with/without an observation and Cook's Distance to find concerned values.
 
 ```{r}
-tb = influence.measures(final_fit)[["infmat"]] %>% as_tibble() %>% 
+tb = influence.measures(log_final_fit)[["infmat"]] %>% as_tibble() %>% 
   mutate(n = 1:3047) %>% 
   select(dffit, cook.d, n) %>% 
   filter(abs(dffit)>1|abs(cook.d)>0.5)
@@ -147,8 +200,8 @@ Consider `DFFITS` and `Cook's Distance`, we found out an influencitial outlier `
 
 ```{r}
 without282 = data_vrb_pre_selec[-282,]
-fit_with282 = lm(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec)
-fit_without282 = lm(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = without282)
+fit_with282 = lm(target_death_rate ~ incidence_rate + log(poverty_percent) + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec)
+fit_without282 = lm(target_death_rate ~ incidence_rate + log(poverty_percent) + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = without282)
 
 sum1 = summary(fit_with282)$coef 
 sum2 = summary(fit_without282)$coef
@@ -156,38 +209,56 @@ sum2 = summary(fit_without282)$coef
 knitr::kable(sum1, caption = "Model with observation 282")
 knitr::kable(sum2, caption = "Model without observation 282")
 
-(sum1[2]-sum2[2])/sum1[2]
-(sum1[3]-sum2[3])/sum1[3]
-(sum1[4]-sum2[4])/sum1[4]
+
+
+coef2 = (sum1[2]-sum2[2])/sum1[2]*100
+coef3  = (sum1[3]-sum2[3])/sum1[3]*100
+coef4 = (sum1[4]-sum2[4])/sum1[4]*100
+coef5 = (sum1[5]-sum2[5])/sum1[5]*100
+coef6 = (sum1[6]-sum2[6])/sum1[6]*100
+coef7 = (sum1[7]-sum2[7])/sum1[7]*100
+coef8 = (sum1[8]-sum2[8])/sum1[8]*100
+coef9 = (sum1[9]-sum2[9])/sum1[9]*100
+coef10 = (sum1[10]-sum2[10])/sum1[10]*100 
+coef11 = (sum1[11]-sum2[11])/sum1[11]*100
+
+rbind(incidence_rate = coef2, log_poverty_percent = coef3, median_age_female = coef4, regionNortheast = coef5, regionSouth = coef6, regionWest = coef7, pct_hs18_24 = coef8, pct_hs25_over = coef9, pct_unemployed16_over = coef10, pct_public_coverage = coef11) 
+
 ```
+
 
 __Comment__
 
-After calculating the coefficient changes for each variables, we found that the changes are significant for `  `.
+After calculating the coefficient changes for each variables, we found that the changes are not significant. We decided to keep the observation `282` in our model. 
 
 
 ```{r fig.height=6}
-fit_without282 = lm(target_death_rate ~ avg_ann_count + incidence_rate + 
-    pop_est2015 + poverty_percent + median_age_female + percent_married + 
-    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
-    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
-    pct_public_coverage + pct_white + pct_black + pct_other_race + 
-    birth_rate + region, data = without282)
+fit_with282 = lm(target_death_rate ~ incidence_rate + log(poverty_percent) + median_age_female + region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, data = data_vrb_pre_selec)
 
 par(mfrow = c(2,2))
-plot(fit_without282)
+plot(fit_with282)
 ```
 
 __Comment__
 
-In the _Residuals vs Fitted Plot_ and _Scale-Location Plot_, 
+In the _Residuals vs Fitted Plot_ and _Scale-Location Plot_, residual values are roughly bounce around 0. 
 
-In the _Quantile–Quantile Plot_, 
+In the _Quantile–Quantile Plot_, it is almost a straight line and no heavy tails. Small departures from normality are not concerning to our model. 
 
-In the _Residuals vs Leverage Plot_, 
-
-
-__Multicolinearity__
+In the _Residuals vs Leverage Plot_, there is no outlying values at the upper right or lower right corner.
 
 
+# Multicolinearity
+
+```{r}
+cor_fit = data_vrb_pre_selec %>% 
+  dplyr::select(target_death_rate, incidence_rate, poverty_percent, median_age_female, pct_hs18_24, pct_hs25_over, pct_unemployed16_over, pct_public_coverage)
+round(cor(cor_fit),3) %>% knitr::kable()
+
+vif(fit_without282)
+```
+
+__Comments__
+
+By checking Correlation Matrix and vif value of each varibles, we found no varibles 
 
