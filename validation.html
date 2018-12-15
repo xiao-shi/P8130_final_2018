@@ -192,6 +192,15 @@ separate(., geography, into = c('county', 'state'), sep = ', ') %&gt;%
 <pre class="r"><code>data_vrb_pre_selec = data_pre %&gt;%
   select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households',
             -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')</code></pre>
+<pre class="r"><code>final_model = lm(formula = target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
+     region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage,
+     data = data_vrb_pre_selec) %&gt;%
+  summary(.)
+
+final_mse = (final_model$sigma)^2
+
+(final_mse)</code></pre>
+<pre><code>## [1] 373.8557</code></pre>
 <p>CV,repeat 10 times</p>
 <pre class="r"><code>mean_mse_cv = 0
 
@@ -211,7 +220,8 @@ for(i in 1:10){
 }
 
 (mean_mse_cv)</code></pre>
-<pre><code>## [1] 376.1392</code></pre>
+<pre><code>## [1] 376.3357</code></pre>
+<p>Test MSE is similar to the MSE of our final model, so the predictive ability of our model is good.</p>
 </div>
 
 
