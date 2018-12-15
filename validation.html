@@ -192,154 +192,14 @@ separate(., geography, into = c('county', 'state'), sep = ', ') %&gt;%
 <pre class="r"><code>data_vrb_pre_selec = data_pre %&gt;%
   select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households',
             -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')</code></pre>
-<pre class="r"><code>#backwards: 16 variables.
-lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
-    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
-    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
-    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
-    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec) %&gt;% 
-    summary()</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
-##     median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
-##     pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
-##     pct_emp_priv_coverage + pct_public_coverage + pct_white + 
-##     pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec)
-## 
-## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -112.091  -10.627   -0.238   10.071  135.452 
-## 
-## Coefficients:
-##                         Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)           113.080994  11.220039  10.078  &lt; 2e-16 ***
-## incidence_rate          0.193431   0.007044  27.460  &lt; 2e-16 ***
-## poverty_percent         0.281082   0.131114   2.144 0.032128 *  
-## median_age_female      -0.327708   0.119043  -2.753 0.005943 ** 
-## percent_married        -0.200423   0.091769  -2.184 0.029039 *  
-## pct_hs18_24             0.266621   0.046308   5.758 9.39e-09 ***
-## pct_hs25_over           0.375950   0.095235   3.948 8.07e-05 ***
-## pct_bach_deg25_over    -0.805985   0.140351  -5.743 1.02e-08 ***
-## pct_unemployed16_over   0.507179   0.153217   3.310 0.000943 ***
-## pct_private_coverage   -0.383180   0.094289  -4.064 4.95e-05 ***
-## pct_emp_priv_coverage   0.345244   0.084997   4.062 4.99e-05 ***
-## pct_public_coverage     0.445192   0.114462   3.889 0.000103 ***
-## pct_white              -0.192670   0.050234  -3.835 0.000128 ***
-## pct_black              -0.262302   0.054551  -4.808 1.60e-06 ***
-## pct_other_race         -0.836882   0.120595  -6.940 4.79e-12 ***
-## birth_rate             -0.598085   0.188066  -3.180 0.001487 ** 
-## regionNortheast        -9.134345   1.558631  -5.860 5.11e-09 ***
-## regionSouth             5.534252   1.030895   5.368 8.54e-08 ***
-## regionWest            -10.222823   1.313732  -7.782 9.76e-15 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 19 on 3028 degrees of freedom
-## Multiple R-squared:  0.5339, Adjusted R-squared:  0.5312 
-## F-statistic: 192.7 on 18 and 3028 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>#stepwise: 19 variables.
-lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
-    pop_est2015 + poverty_percent + median_age_female + percent_married + 
-    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
-    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
-    pct_public_coverage + pct_white + pct_black + pct_other_race + 
-    birth_rate + region, data = data_vrb_pre_selec) %&gt;% 
-    summary()</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
-##     pop_est2015 + poverty_percent + median_age_female + percent_married + 
-##     pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
-##     pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
-##     pct_public_coverage + pct_white + pct_black + pct_other_race + 
-##     birth_rate + region, data = data_vrb_pre_selec)
-## 
-## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -112.645  -10.615   -0.205   10.090  135.036 
-## 
-## Coefficients:
-##                         Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)            1.190e+02  1.163e+01  10.228  &lt; 2e-16 ***
-## avg_ann_count         -1.499e-03  7.013e-04  -2.138 0.032587 *  
-## incidence_rate         1.951e-01  7.100e-03  27.474  &lt; 2e-16 ***
-## pop_est2015            4.804e-06  3.002e-06   1.600 0.109654    
-## poverty_percent        2.512e-01  1.315e-01   1.911 0.056061 .  
-## median_age_female     -2.659e-01  1.217e-01  -2.185 0.028961 *  
-## percent_married       -1.833e-01  9.244e-02  -1.983 0.047481 *  
-## pct_no_hs18_24        -9.733e-02  5.361e-02  -1.816 0.069527 .  
-## pct_hs18_24            2.475e-01  4.709e-02   5.257 1.57e-07 ***
-## pct_hs25_over          3.573e-01  9.587e-02   3.727 0.000198 ***
-## pct_bach_deg25_over   -8.367e-01  1.430e-01  -5.851 5.40e-09 ***
-## pct_unemployed16_over  4.967e-01  1.535e-01   3.236 0.001224 ** 
-## pct_private_coverage  -4.410e-01  9.959e-02  -4.428 9.83e-06 ***
-## pct_emp_priv_coverage  3.530e-01  8.555e-02   4.126 3.79e-05 ***
-## pct_public_coverage    4.204e-01  1.164e-01   3.613 0.000308 ***
-## pct_white             -2.071e-01  5.049e-02  -4.101 4.22e-05 ***
-## pct_black             -2.599e-01  5.455e-02  -4.764 1.99e-06 ***
-## pct_other_race        -8.018e-01  1.223e-01  -6.555 6.52e-11 ***
-## birth_rate            -5.608e-01  1.884e-01  -2.977 0.002935 ** 
-## regionNortheast       -9.324e+00  1.561e+00  -5.973 2.60e-09 ***
-## regionSouth            4.800e+00  1.061e+00   4.525 6.27e-06 ***
-## regionWest            -1.074e+01  1.333e+00  -8.052 1.16e-15 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 18.98 on 3025 degrees of freedom
-## Multiple R-squared:  0.5353, Adjusted R-squared:  0.532 
-## F-statistic: 165.9 on 21 and 3025 DF,  p-value: &lt; 2.2e-16</code></pre>
-<pre class="r"><code>#Cp: 16 variables.
-lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + pop_est2015 + poverty_percent + 
-    median_age_male + pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over +
-    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
-    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
-    pct_other_race + birth_rate, data = data_vrb_pre_selec) %&gt;% 
-    summary()</code></pre>
-<pre><code>## 
-## Call:
-## lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
-##     pop_est2015 + poverty_percent + median_age_male + pct_no_hs18_24 + 
-##     pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
-##     pct_private_coverage + pct_emp_priv_coverage + pct_public_coverage + 
-##     pct_white + pct_other_race + birth_rate, data = data_vrb_pre_selec)
-## 
-## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -104.789  -11.063   -0.118   10.810  137.668 
-## 
-## Coefficients:
-##                         Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)            1.195e+02  1.024e+01  11.671  &lt; 2e-16 ***
-## avg_ann_count         -1.542e-03  7.022e-04  -2.196 0.028192 *  
-## incidence_rate         1.996e-01  7.149e-03  27.916  &lt; 2e-16 ***
-## pop_est2015            4.420e-06  3.033e-06   1.458 0.145068    
-## poverty_percent        4.242e-01  1.242e-01   3.414 0.000648 ***
-## median_age_male       -2.930e-01  1.173e-01  -2.497 0.012574 *  
-## pct_no_hs18_24        -1.544e-01  5.362e-02  -2.880 0.004001 ** 
-## pct_hs18_24            2.411e-01  4.701e-02   5.128 3.11e-07 ***
-## pct_hs25_over          3.820e-01  9.409e-02   4.059 5.04e-05 ***
-## pct_bach_deg25_over   -1.095e+00  1.421e-01  -7.702 1.80e-14 ***
-## pct_unemployed16_over  2.606e-01  1.553e-01   1.678 0.093489 .  
-## pct_private_coverage  -5.679e-01  9.421e-02  -6.028 1.86e-09 ***
-## pct_emp_priv_coverage  3.206e-01  8.519e-02   3.763 0.000171 ***
-## pct_public_coverage    1.667e-01  1.103e-01   1.511 0.130862    
-## pct_white             -1.021e-01  2.995e-02  -3.408 0.000662 ***
-## pct_other_race        -9.200e-01  1.198e-01  -7.681 2.12e-14 ***
-## birth_rate            -7.405e-01  1.889e-01  -3.920 9.05e-05 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 19.53 on 3030 degrees of freedom
-## Multiple R-squared:  0.5075, Adjusted R-squared:  0.5049 
-## F-statistic: 195.1 on 16 and 3030 DF,  p-value: &lt; 2.2e-16</code></pre>
 <p>CV,repeat 10 times</p>
 <pre class="r"><code>mean_mse_cv = 0
 
 for(i in 1:10){
   data_train&lt;-trainControl(method=&quot;cv&quot;, number=10)
 
-  model_caret&lt;-train(target_death_rate ~ incidence_rate + poverty_percent + median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + pct_public_coverage + pct_white + pct_black + pct_other_race + birth_rate + region, 
+  model_caret&lt;-train(target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
+     region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, 
                    data = data_vrb_pre_selec,
                    trControl=data_train,
                    method='lm',
@@ -351,7 +211,7 @@ for(i in 1:10){
 }
 
 (mean_mse_cv)</code></pre>
-<pre><code>## [1] 365.7674</code></pre>
+<pre><code>## [1] 376.1392</code></pre>
 </div>
 
 
