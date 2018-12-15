@@ -98,8 +98,13 @@ data_vrb_pre_selec = data_pre %>%
 ```
 
 ```{r}
+ggplot(data_vrb_pre_selec) +
+  geom_density(aes(x = target_death_rate))
+```
+
+```{r}
 final_model = lm(formula = target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
-     region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage,
+     region + pct_hs25_over + pct_unemployed16_over + pct_public_coverage + pct_black,
      data = data_vrb_pre_selec) %>%
   summary(.)
 
@@ -117,7 +122,7 @@ for(i in 1:10){
   data_train<-trainControl(method="cv", number=10)
 
   model_caret<-train(target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
-     region + pct_hs18_24 + pct_hs25_over + pct_unemployed16_over + pct_public_coverage, 
+     region + pct_hs25_over + pct_unemployed16_over + pct_public_coverage + pct_black, 
                    data = data_vrb_pre_selec,
                    trControl=data_train,
                    method='lm',
