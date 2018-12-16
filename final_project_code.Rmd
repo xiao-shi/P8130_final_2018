@@ -1,0 +1,695 @@
+---
+title: "final_project_code"
+author: "Catherine"
+date: "12/16/2018"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+  
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(glmnet)
+library('leaps')
+library(broom)
+library(patchwork)
+library(HH)
+library(faraway)
+library(caret)
+library(readxl)
+```
+
+# DATA Preprocessing
+
+Import original dataset:
+```{r import_data_p2, echo = FALSE, message = FALSE}
+data = read_csv(file='./Cancer_Registry.csv') %>% 
+  janitor::clean_names()
+```
+
+build 'region' variable from 'geography'. This is gonna be the only categorical variable in the dataset.
+```{r}
+data_pre = data %>% 
+separate(., geography, into = c('county', 'state'), sep = ', ') %>% 
+  mutate(., region = replace(state, state == 'Connecticut', 'Northeast'),
+            region = replace(region, region == 'Maine', 'Northeast'),
+            region = replace(region, region == 'Massachusetts', 'Northeast'),
+            region = replace(region, region == 'New Hampshire', 'Northeast'),
+            region = replace(region, region == 'Rhode Island', 'Northeast'),
+            region = replace(region, region == 'Vermont', 'Northeast'),
+            region = replace(region, region == 'New Jersey', 'Northeast'),
+            region = replace(region, region == 'New York', 'Northeast'),
+            region = replace(region, region == 'Pennsylvania', 'Northeast'),
+            region = replace(region, region == 'Indiana', 'Midwest'),
+            region = replace(region, region == 'Michigan', 'Midwest'),
+            region = replace(region, region == 'Illinois', 'Midwest'),
+            region = replace(region, region == 'Ohio', 'Midwest'),
+            region = replace(region, region == 'Wisconsin', 'Midwest'),
+            region = replace(region, region == 'Iowa', 'Midwest'),
+            region = replace(region, region == 'Kansas', 'Midwest'),
+            region = replace(region, region == 'Minnesota', 'Midwest'),
+            region = replace(region, region == 'Missouri', 'Midwest'),
+            region = replace(region, region == 'Nebraska', 'Midwest'),
+            region = replace(region, region == 'North Dakota', 'Midwest'),
+            region = replace(region, region == 'South Dakota', 'Midwest'),
+            region = replace(region, region == 'Delaware', 'South'),
+            region = replace(region, region == 'Florida', 'South'),
+            region = replace(region, region == 'Georgia', 'South'),
+            region = replace(region, region == 'Maryland', 'South'),
+            region = replace(region, region == 'North Carolina', 'South'),
+            region = replace(region, region == 'South Carolina', 'South'),
+            region = replace(region, region == 'Virginia', 'South'),
+            region = replace(region, region == 'District of Columbia', 'South'),
+            region = replace(region, region == 'West Virginia', 'South'),
+            region = replace(region, region == 'Alabama', 'South'),
+            region = replace(region, region == 'Kentucky', 'South'),
+            region = replace(region, region == 'Mississippi', 'South'),
+            region = replace(region, region == 'Tennessee', 'South'),
+            region = replace(region, region == 'Arkansas', 'South'),
+            region = replace(region, region == 'Louisiana', 'South'),
+            region = replace(region, region == 'Oklahoma', 'South'),
+            region = replace(region, region == 'Texas', 'South'),
+            region = replace(region, region == 'Arizona', 'West'),
+            region = replace(region, region == 'Colorado', 'West'),
+            region = replace(region, region == 'Idaho', 'West'),
+            region = replace(region, region == 'Montana', 'West'),
+            region = replace(region, region == 'Nevada', 'West'),
+            region = replace(region, region == 'New Mexico', 'West'),
+            region = replace(region, region == 'Utah', 'West'),
+            region = replace(region, region == 'Wyoming', 'West'),
+            region = replace(region, region == 'Alaska', 'West'),
+            region = replace(region, region == 'California', 'West'),
+            region = replace(region, region == 'Hawaii', 'West'),
+            region = replace(region, region == 'Oregon', 'West'),
+            region = replace(region, region == 'Washington', 'West'))
+```
+
+
+There are 3 variables that has missing data in the original dataset: 'pct_some_col18_24', 'pct_employed16_over', 'pct_private_coverage_alone'. Since 'pct_no_hs18_24', 'pct_some_col18_24', 'pct_hs18_24', and 'pct_bach_deg18_24' together equals 100, here I re-calculate the 'pct_some_col18_24' variable so that it would not contain missing data anymore.
+```{r}
+data_pre = 
+  mutate(data_pre, 
+         pct_some_col18_24 = 100 - (pct_no_hs18_24 + pct_hs18_24 + pct_bach_deg18_24))
+```
+
+
+# Variable Pre-Selection (before putting variables into the model)
+
+Things being considered under this section: \
+(1) Checking collinearity for the continuous variables (using 0.7 as rule of thumb). \
+(2) complete variable over variable with missing data. \
+(3) Practical importance. \
+(4) Real life situation. \
+(5) Not to eliminate too many variables for later model building (LASSO, Automatic selection). \
+
+```{r eval = FALSE, message = FALSE}
+data_pre %>%
+  dplyr::select(., -'binned_inc', -'county', -'state', -'region') %>% 
+  cor(., use='complete.obs')
+```
+
+## decision reasoning for this part:
+__Decision 1: not to use 'avg_deaths_per_year' variable.__ \
+Reasoning: 'avg_deaths_per_year', 'avg_ann_count', and 'pop_est2015' appear to be correlated. First of all, it's not hard for local government to have access to all the three variables, so it's probably better to keep them all for now. However, since we are predicting the Death Rate, having both 'avg_deaths_per_year' and 'pop_est2015' available seems a little bit weird because we can probably just calculate the true Death Rate. Since population is a more common variable to have access to, I would not be using 'avg_deaths_per_year' during nest step. \
+
+__Decision 2: keeping the 'median_age_male', 'median_age_female' pair, as well as the 'pct_white', 'pct_black' pair even they are correlated.__ \
+Reasoning: For practical importance, all of the four variables are common and what people are care about. \
+
+__Decision 3: not to use 'binned_inc'.__
+Reasoning: 'binned_inc' is the median income binned by decile, there is 10 distinct range for this variable, which means we can potentially make it to be a categorical data. However, this categorial variable might be complicated to interpret. Instead, I choose to use the continuous variable 'med_income' who is correlated to 'binned_inc'. \
+
+__Decision 4: not to used 'pct_married_households'__
+Reasoning: 'pct_married_households' and 'percent_married' are correlated, while 'percent_married' is more accessible. \
+
+__Decision 5: keep a 'correlation network' of variables__
+Reasoning: When looking at which variables are correlated, there is a group of variables, roughly including 'poverty_percent', 'med_income', the education_related variables,the employment_related variables, and the health coverage_related variables, that are somewhat correlated. I don't want to eliminate any of them just yet because, first of all, it's hard to decide which severals to keep, and secondly, I can live them for latter model building using LASSO or automatic selection method. \
+
+__Decision 6: not to use 'pct_employed16_over' and 'pct_private_coverage_alone' with missing data.__
+Reasoning: I didn't come up with some way to makeup of those missing data. If using this two variable, a lot of observations would not be able to fit in the model, therefore wasting some of the information. Also, since the two variables are somewhat correlated to other variables, I'm not too worried about missing those infomation.
+
+## Conclusion:
+__Variables not gonna be used before model selection:__ 
+
+'avg_deaths_per_year', 'binned_inc', 'pct_married_households', 
+'pct_employed16_over', 'pct_private_coverage_alone'.
+
+Dataset after variable pre-selection:
+```{r}
+data_vrb_pre_selec = data_pre %>%
+  dplyr::select(., -'avg_deaths_per_year', -'binned_inc', -'pct_married_households',
+            -'pct_employed16_over', -'pct_private_coverage_alone', -'county', -'state')
+```
+
+# Model Selection
+
+## LASSO
+```{r}
+set.seed(1)
+data_vrb_pre_selec_df = data.frame(data_vrb_pre_selec)
+
+Y = data_vrb_pre_selec_df[,2]
+X = model.matrix(target_death_rate ~ ., data=data_vrb_pre_selec_df) 
+# 'region' into dummy variable.
+
+train = sample(1:nrow(X),nrow(X)*0.8)
+
+cv.out = cv.glmnet(X[train,],Y[train])
+#plot(cv.out)
+best.lambda = cv.out$lambda.min
+
+lasso2 = glmnet(X, Y, alpha=1, lambda=best.lambda)
+coef(lasso2)
+```
+
+Using LASSO, the coefficient of 'med_income', 'pop_est2015', 'study_per_cap', 'median_age' and 'pct_some_col18_24' became 0. Those variables can potentially be eliminated from our model.
+
+## Automatic Procedures
+
+### Forward Elimination
+
+```{r eval = FALSE}
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+pct_no_hs18_24+
+            pct_some_col18_24+birth_rate+median_age_female+pct_unemployed16_over+
+            pct_hs25_over+pct_public_coverage_alone+region+pct_other_race+
+            poverty_percent+incidence_rate+pct_bach_deg25_over+avg_ann_count,
+          data=data_vrb_pre_selec)
+
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+pct_no_hs18_24+
+            pct_some_col18_24+birth_rate+median_age_female+pct_unemployed16_over+
+            pct_hs25_over+pct_public_coverage_alone+region+pct_other_race+
+            poverty_percent+incidence_rate+pct_bach_deg25_over+med_income,
+          data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+pct_no_hs18_24+
+            pct_some_col18_24+birth_rate+median_age_female+pct_unemployed16_over+
+            pct_hs25_over+pct_public_coverage_alone+region+pct_other_race+
+            poverty_percent+incidence_rate+pct_bach_deg25_over+pop_est2015,
+          data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+pct_no_hs18_24+
+            pct_some_col18_24+birth_rate+median_age_female+pct_unemployed16_over+
+            pct_hs25_over+pct_public_coverage_alone+region+pct_other_race+
+            poverty_percent+incidence_rate+pct_bach_deg25_over+study_per_cap,
+          data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+pct_bach_deg25_over+
+            median_age, data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+pct_bach_deg25_over+
+            median_age_male, data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+pct_bach_deg25_over+
+            avg_household_size, data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+          pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+pct_no_hs18_24+
+            pct_some_col18_24+birth_rate+median_age_female+pct_unemployed16_over+
+            pct_hs25_over+pct_public_coverage_alone+region+pct_other_race+
+            poverty_percent+incidence_rate+pct_bach_deg25_over+percent_married, 
+          data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+pct_bach_deg25_over+
+            pct_public_coverage, data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+pct_bach_deg25_over+
+            percent_married, data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+pct_bach_deg25_over+
+            pct_white, data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+pct_bach_deg25_over+
+            pct_black, data=data_vrb_pre_selec)
+tidy(fit1)
+
+fit1 = lm(target_death_rate ~ 
+            pct_emp_priv_coverage+pct_private_coverage+pct_bach_deg18_24+
+            pct_no_hs18_24+pct_some_col18_24+birth_rate+median_age_female+
+            pct_unemployed16_over+pct_hs25_over+pct_public_coverage_alone+
+            region+pct_other_race+poverty_percent+incidence_rate+
+            pct_bach_deg25_over+pct_asian, data=data_vrb_pre_selec)
+tidy(fit1)
+```
+
+Forward Elimination result: 15 variables \
+lm(formula = target_death_rate ~ pct_bach_deg25_over + incidence_rate + poverty_percent + 
+pct_other_race + region + pct_public_coverage_alone + pct_hs25_over + pct_unemployed16_over +
+median_age_female + birth_rate + pct_some_col18_24 + pct_no_hs18_24 + pct_bach_deg18_24 +
+pct_private_coverage + pct_emp_priv_coverage, data = data_vrb_pre_selec)
+
+### Backward Elimination
+
+```{r eval = FALSE}
+mult.fit_BW = lm(target_death_rate ~ ., data=data_vrb_pre_selec)
+summary(mult.fit_BW)
+
+step1 = update(mult.fit_BW, . ~ . -pct_bach_deg18_24)
+summary(step1)
+
+step2 = update(step1, . ~ . -study_per_cap)
+summary(step2)
+
+step3 = update(step2, . ~ . -med_income)
+summary(step3)
+
+step4 = update(step3, . ~ . -median_age)
+summary(step4)
+
+step5 = update(step4, . ~ . -pct_public_coverage_alone)
+summary(step5)
+
+step6 = update(step5, . ~ . -pct_asian)
+summary(step6)
+
+step7 = update(step6, . ~ . -pct_some_col18_24)
+summary(step7)
+
+step8 = update(step7, . ~ . -median_age_male)
+summary(step8)
+
+step9 = update(step8, . ~ . -avg_household_size)
+summary(step9)
+
+step10 = update(step9, . ~ . -pop_est2015)
+summary(step10)
+
+step11 = update(step10, . ~ . -avg_ann_count)
+summary(step11)
+
+step12 = update(step11, . ~ . -pct_no_hs18_24)
+summary(step12)
+```
+
+Using backward selection, 'pct_bach_deg18_24', 'study_per_cap', 'med_income', 'median_age', 'pct_public_coverage_alone', 'pct_asian', 'pct_some_col18_24', 'median_age_male', 'avg_household_size', 'pop_est2015', 'avg_ann_count', and 'pct_no_hs18_24' were eliminated from the model. \
+
+lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec)
+
+### Stepwise Regression
+
+```{r eval = FALSE}
+mult.fit_SW = lm(target_death_rate ~ ., data=data_vrb_pre_selec)
+step(mult.fit_SW, direction='backward')
+```
+Stepwise Result: 19 variables. \
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
+    pop_est2015 + poverty_percent + median_age_female + percent_married + 
+    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
+    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
+    pct_public_coverage + pct_white + pct_black + pct_other_race + 
+    birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+
+## criterion-based procedures
+
+### Cp
+
+```{r eval = FALSE}
+data_frame = data.frame(data_vrb_pre_selec)
+leaps(x = data_frame[,c('avg_ann_count','incidence_rate','med_income',
+                      'pop_est2015','poverty_percent','study_per_cap','median_age',
+                      'median_age_male','median_age_female','avg_household_size',
+                      'percent_married','pct_no_hs18_24','pct_hs18_24',
+                      'pct_some_col18_24','pct_hs25_over','pct_bach_deg25_over',
+                      'pct_unemployed16_over','pct_private_coverage',
+                      'pct_emp_priv_coverage','pct_public_coverage',
+                      'pct_public_coverage_alone','pct_white','pct_black',
+                      'pct_asian','pct_other_race','birth_rate')], 
+      y = data_frame[,2], nbest=1, method='Cp')
+```
+
+Including 'pct_bach_deg18_24' doesn't work for the function.
+
+Suggested: 16 variables.
+'avg_ann_count','incidence_rate','pop_est2015','poverty_percent', 'median_age_male', 'pct_no_hs18_24','pct_hs18_24', 'pct_hs25_over','pct_bach_deg25_over','pct_unemployed16_over','pct_private_coverage','pct_emp_priv_coverage','pct_public_coverage','pct_white','pct_other_race','birth_rate'.
+
+
+### adjr2:
+
+```{r eval = FALSE}
+leaps(x = data_frame[,c('avg_ann_count','incidence_rate','med_income',
+                      'pop_est2015','poverty_percent','study_per_cap',
+                      'median_age','median_age_male','median_age_female',
+                      'avg_household_size','percent_married','pct_no_hs18_24',
+                      'pct_hs18_24','pct_some_col18_24','pct_hs25_over',
+                      'pct_bach_deg25_over','pct_unemployed16_over',
+                      'pct_private_coverage','pct_emp_priv_coverage',
+                      'pct_public_coverage','pct_public_coverage_alone',
+                      'pct_white','pct_black','pct_asian','pct_other_race',
+                      'birth_rate')], 
+      y = data_frame[,2], nbest=1, method='adjr2')
+```
+ 
+The Adjusted R^2 are very similar, doesn't give too much information for model selection.
+
+Plots of Cp and Adj-R2 as functions of parameters:
+```{r}
+b = regsubsets(target_death_rate ~ ., data=data_vrb_pre_selec, nvmax = 30)
+rs = summary(b)
+
+par(mar=c(4,4,1,1))
+par(mfrow=c(1,2))
+
+plot(1:29, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
+abline(0,1)
+
+plot(1:29, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
+```
+
+
+## Summary of Model Selection
+
+backwards: 16 variables.
+lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+    median_age_female + percent_married + pct_hs18_24 + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_black + pct_other_race + birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+
+forwards: 15 variables 
+lm(formula = target_death_rate ~ pct_bach_deg25_over + incidence_rate + poverty_percent + 
+   pct_other_race + region + pct_public_coverage_alone + pct_hs25_over + pct_unemployed16_over +
+   median_age_female + birth_rate + pct_some_col18_24 + pct_no_hs18_24 + pct_bach_deg18_24 +
+   pct_private_coverage + pct_emp_priv_coverage, data = data_vrb_pre_selec) %>% 
+   summary
+    
+stepwise: 19 variables.
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + 
+    pop_est2015 + poverty_percent + median_age_female + percent_married + 
+    pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over + pct_bach_deg25_over + 
+    pct_unemployed16_over + pct_private_coverage + pct_emp_priv_coverage + 
+    pct_public_coverage + pct_white + pct_black + pct_other_race + 
+    birth_rate + region, data = data_vrb_pre_selec) %>% 
+    summary()
+    
+Cp: 16 variables.
+lm(formula = target_death_rate ~ avg_ann_count + incidence_rate + pop_est2015 + poverty_percent + 
+    median_age_male + pct_no_hs18_24 + pct_hs18_24 + pct_hs25_over +
+    pct_bach_deg25_over + pct_unemployed16_over + pct_private_coverage + 
+    pct_emp_priv_coverage + pct_public_coverage + pct_white + 
+    pct_other_race + birth_rate, data = data_vrb_pre_selec) %>% 
+    summary()
+
+# Variable Post-Selection (using collinearity and lit review)
+we focus on:
+(1) Age
+(2) Education
+(3) Employment
+(4) Health Coverage
+
+# Final Model Summary:
+
+__Original 33 varables:__
+
+(X)avg_ann_count: eliminated during post-selection, similar to 'incidence_rate'
+(X)avg_deaths_per_year: eliminated during pre-selection
+~incidence_rate
+(X)med_income: eliminated during model selection
+(X)pop_est2015: eliminated during model selection
+~poverty_percent
+(X)study_per_cap: eliminated during model selection
+(X)binned_inc: eliminated during pre-selection
+
+(X)median_age: eliminated during model selection
+(X)median_age_male: eliminated during post-selection, correlated with 'median_age_female'
+~median_age_female
+
+~region(from original 'geography')
+
+(X)avg_household_size: eliminated during model selection
+
+(X)percent_married: eliminated during post-selection
+
+(X)pct_no_hs18_24: eliminated during model selection
+(X)pct_hs18_24: eliminated during post-selection
+(X)pct_some_col18_24: eliminated during model selection
+(X)pct_bach_deg18_24: eliminated during model selection
+~pct_hs25_over
+(X)pct_bach_deg25_over: eliminated during model selection
+
+(X)pct_employed16_over: eliminated during pre-selection, has missing value
+~pct_unemployed16_over
+
+pct_private_coverage: eliminated during post-selection, lit review
+(X) pct_private_coverage_alone: eliminated during pre-selection, has missing value
+(X)pct_emp_priv_coverage: eliminated during post-selection, lit review
+~pct_public_coverage
+(X) pct_public_coverage_alone eliminated during model selection
+
+(X)pct_white: eliminated during post-selection
+(X)pct_black: eliminated during post-selection
+(X)pct_asian: eliminated during model selection
+(X)pct_other_race: eliminated during model selection
+
+(X)pct_married_households: eliminated during during pre-selection
+(X)birth_rate: eliminated during during post-selection
+
+
+
+# Final: 
+
+```{r}
+lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+     median_age_female + region + pct_hs25_over + pct_unemployed16_over +
+     pct_public_coverage + pct_black,
+     data = data_vrb_pre_selec) %>% 
+  summary(.)
+```
+
+
+Report:
+
+Data Preprocessing:
+Original dataset contains 3047 counties in the United States. To check whether regional factor has influence on the death rate of cancer, we grouped counties into 4 regions in the United states: South, West, Midwest, and Northeast. There are 3 variables that has missing data in the original dataset: 'pct_some_col18_24', 'pct_employed16_over', 'pct_private_coverage_alone'. Since 'pct_no_hs18_24', 'pct_some_col18_24', 'pct_hs18_24', and 'pct_bach_deg18_24' together equals 100, we re-calculated the 'pct_some_col18_24' variable so that it would not contain any missing value.
+
+
+Model selection:
+Model selection includes three parts: variable pre-selection, variable selection, and variable post-selection.Variable pre-selection part is to give a overview to the original dataset. There are five considerations during this step: Checking collinearity for the continuous variables (using 0.7 as rule of thumb); Choosing complete variable over variable with missing data; Practical importance; Real life situation; Not to eliminate too many variables for later model building. LASSO, automatic approaches (forward, backward, stepwise selection), and criterion approaches (Cp, R^2, AIC) were used for variable selection. All of them ended up with roughly 15-19 similar variables. Literature review and collinearity were take into consideration during variable post-selection to further reduce the number of independent variables.
+
+# Model Diagnose
+
+Fit the model we got from model selection.
+
+```{r}
+final_fit = lm(formula = target_death_rate ~ incidence_rate + poverty_percent +
+                 median_age_female + region + pct_hs25_over + pct_unemployed16_over +
+                 pct_public_coverage + pct_black, data = data_vrb_pre_selec)
+```
+
+
+## Plot the regression model
+
+```{r}
+par(mfrow = c(2,2))
+plot(final_fit)
+```
+
+## Outliers
+
+## Detect outliers in Y using ‘studentized residuals’
+
+```{r}
+sr = rstandard(final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
+outlier_y = sr %>% filter(abs(value) > 2.5) 
+names(outlier_y) = c("over_2.5", "observation_n") 
+knitr::kable(outlier_y, caption = "Outliers of y")
+```
+
+__Comment__
+
+There are __72__ ouliers in Y being detected. 
+
+## Detect outliners in X using Leverage values
+
+```{r}
+fit_hat = hatvalues(final_fit) %>% as_tibble() %>% mutate(n = 1:3047)
+outlier_x_moderate = fit_hat %>% filter(abs(value) > 0.2) 
+outlier_x_high = fit_hat %>% filter(abs(value) > 0.5)
+```
+
+__Comment__
+
+By taking look at the $h_{ii}$ values, we detect __no oulier in X__ with both cutoff $h_{ii} > 0.2$ and cutoff $h_{ii} > 0.5$.
+
+## Influencial Observation
+
+Not all outliers are influential. Therefore, we need to test the influence of the outliers. 
+Using DFFITS test the difference of fitted value with/without an observation and Cook's Distance to find concerned values.
+
+```{r}
+tb = influence.measures(final_fit)[["infmat"]] %>% as_tibble() %>% 
+  mutate(n = 1:3047) %>% 
+  dplyr::select(dffit, cook.d, n) %>% 
+  filter(abs(dffit)>1|abs(cook.d)>0.5)
+knitr::kable(tb, caption = "Influential observation")
+```
+
+__Comment__
+
+Consider `DFFITS` and `Cook's Distance`, we found out an influencitial outlier `282`. The difference is large between fitted value with/without `282` observation. Next, we can take a look at the change of fitted value with/without `282`.
+
+```{r}
+without282 = data_vrb_pre_selec[-282,]
+fit_with282 = lm(formula = target_death_rate ~ incidence_rate + poverty_percent +
+                   median_age_female + region + pct_hs25_over + pct_unemployed16_over +
+                   pct_public_coverage + pct_black, data = data_vrb_pre_selec)
+fit_without282 = lm(formula = target_death_rate ~ incidence_rate + poverty_percent +
+                    median_age_female + region + pct_hs25_over + pct_unemployed16_over +
+                    pct_public_coverage + pct_black, data = without282)
+
+sum1 = summary(fit_with282)$coef 
+sum2 = summary(fit_without282)$coef
+
+knitr::kable(sum1, caption = "Model with observation 282")
+knitr::kable(sum2, caption = "Model without observation 282")
+
+
+
+coef2 = (sum1[2]-sum2[2])/sum1[2]*100
+coef3  = (sum1[3]-sum2[3])/sum1[3]*100
+coef4 = (sum1[4]-sum2[4])/sum1[4]*100
+coef5 = (sum1[5]-sum2[5])/sum1[5]*100
+coef6 = (sum1[6]-sum2[6])/sum1[6]*100
+coef7 = (sum1[7]-sum2[7])/sum1[7]*100
+coef8 = (sum1[8]-sum2[8])/sum1[8]*100
+coef9 = (sum1[9]-sum2[9])/sum1[9]*100
+coef10 = (sum1[10]-sum2[10])/sum1[10]*100 
+coef11 = (sum1[11]-sum2[11])/sum1[11]*100
+
+rbind(incidence_rate = coef2, log_poverty_percent = coef3, median_age_female = coef4,
+      regionNortheast = coef5, regionSouth = coef6, regionWest = coef7, 
+      pct_hs18_24 = coef8, pct_hs25_over = coef9, pct_unemployed16_over = coef10,
+      pct_public_coverage = coef11) 
+```
+
+
+__Comment__
+
+After calculating the coefficient changes for each variables, we found that the changes are not significant. We decided to keep the observation `282` in our model. 
+
+
+```{r fig.height=6}
+fit_with282 = lm(formula = target_death_rate ~ incidence_rate + poverty_percent +
+                   median_age_female + region + pct_hs25_over + pct_unemployed16_over +
+                   pct_public_coverage + pct_black, data = data_vrb_pre_selec)
+
+par(mfrow = c(2,2))
+plot(fit_with282)
+```
+
+__Comment__
+
+In the _Residuals vs Fitted Plot_ and _Scale-Location Plot_, residual values are roughly bounce around 0. 
+
+In the _Quantile–Quantile Plot_, it is almost a straight line and no heavy tails. Small departures from normality are not concerning to our model. 
+
+In the _Residuals vs Leverage Plot_, there is no outlying values at the upper right or lower right corner.
+
+
+## Multicolinearity
+
+```{r}
+cor_fit = data_vrb_pre_selec %>% 
+  dplyr::select(target_death_rate, incidence_rate, poverty_percent, median_age_female,
+                pct_hs25_over, pct_unemployed16_over, pct_public_coverage, pct_black)
+
+round(cor(cor_fit),3) %>% knitr::kable()
+
+vif(fit_with282)
+```
+
+__Comments__
+
+By checking Correlation Matrix and vif value of each varibles, we found no correlation over 0.7 and no vif over 5. The variables we chose are significant.
+
+# Model Validation
+
+```{r}
+ggplot(data_vrb_pre_selec) +
+  geom_density(aes(x = target_death_rate))
+```
+
+```{r}
+final_model = lm(formula = target_death_rate ~ incidence_rate + poverty_percent +
+                   median_age_female + region + pct_hs25_over + pct_unemployed16_over +
+                   pct_public_coverage + pct_black,
+                 data = data_vrb_pre_selec) %>%
+summary(.)
+
+final_mse = (final_model$sigma)^2
+
+(final_mse)
+```
+
+## Cross Validation - repeat 10 times
+
+```{r}
+mean_mse_cv = 0
+
+for(i in 1:10){
+  data_train<-trainControl(method="cv", number=10)
+
+  model_caret<-train(target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
+     region + pct_hs25_over + pct_unemployed16_over + pct_public_coverage + pct_black, 
+                   data = data_vrb_pre_selec,
+                   trControl=data_train,
+                   method='lm',
+                   na.action=na.pass)
+  
+  MSE = mean((model_caret$resample$RMSE)^2)
+
+  mean_mse_cv = mean_mse_cv + MSE/10
+}
+
+(mean_mse_cv)
+```
+
+Test MSE is similar to the MSE of our final model, so the predictive ability of our model is good.
