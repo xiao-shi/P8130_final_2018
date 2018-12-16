@@ -11,11 +11,6 @@ library(tidyverse)
 library(glmnet)
 library('leaps')
 library(broom)
-#library(faraway)
-#library('leaps')
-#library(caret)
-#library(dplyr)
-#library(readxl)
 ```
 
 =======================================================================================================
@@ -348,7 +343,7 @@ we focus on:
 (2) Education
 (3) Employment
 (4) Health Coverage
-
+(5) Race
 =======================================================================================================
 # Final Model Summary:
 
@@ -390,7 +385,7 @@ pct_private_coverage: eliminated during post-selection, lit review
 (X) pct_public_coverage_alone eliminated during model selection
 
 (X)pct_white: eliminated during post-selection
-(X)pct_black: eliminated during post-selection
+~pct_black
 (X)pct_asian: eliminated during model selection
 (X)pct_other_race: eliminated during model selection
 
@@ -398,23 +393,13 @@ pct_private_coverage: eliminated during post-selection, lit review
 (X)birth_rate: eliminated during during post-selection
 
 
-################ 
-Final: 
-################ 
+################################  
+Model after selection 
+################################  
 ```{r}
 lm(formula = target_death_rate ~ incidence_rate + poverty_percent + median_age_female +
      region + pct_hs25_over + pct_unemployed16_over + pct_public_coverage + pct_black,
      data = data_vrb_pre_selec) %>% 
   summary(.)
 ```
-
-
-Report:
-
-Data Preprocessing:
-Original dataset contains 3047 counties in the United States. To check whether regional factor has influence on the death rate of cancer, we grouped counties into 4 regions in the United states: South, West, Midwest, and Northeast. There are 3 variables that has missing data in the original dataset: 'pct_some_col18_24', 'pct_employed16_over', 'pct_private_coverage_alone'. Since 'pct_no_hs18_24', 'pct_some_col18_24', 'pct_hs18_24', and 'pct_bach_deg18_24' together equals 100, we re-calculated the 'pct_some_col18_24' variable so that it would not contain any missing value.
-
-
-Model selection:
-Model selection includes three parts: variable pre-selection, variable selection, and variable post-selection.Variable pre-selection part is to give a overview to the original dataset. There are five considerations during this step: Checking collinearity for the continuous variables (using 0.7 as rule of thumb); Choosing complete variable over variable with missing data; Practical importance; Real life situation; Not to eliminate too many variables for later model building. LASSO, automatic approaches (forward, backward, stepwise selection), and criterion approaches (Cp, R^2, AIC) were used for variable selection. All of them ended up with roughly 15-19 similar variables. Literature review and collinearity were take into consideration during variable post-selection to further reduce the number of independent variables.
 
