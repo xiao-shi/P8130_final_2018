@@ -378,7 +378,7 @@ __Original 33 varables:__
 (X)pct_employed16_over: eliminated during pre-selection, has missing value
 ~pct_unemployed16_over
 
-pct_private_coverage: eliminated during post-selection, lit review
+(X)pct_private_coverage: eliminated during post-selection, lit review
 (X) pct_private_coverage_alone: eliminated during pre-selection, has missing value
 (X)pct_emp_priv_coverage: eliminated during post-selection, lit review
 ~pct_public_coverage
