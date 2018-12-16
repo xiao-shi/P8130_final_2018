@@ -213,5 +213,5 @@ vif(fit_with282)
 
 __Comments__
 
-By checking Correlation Matrix and vif value of each varibles, we found no varibles 
+By checking Correlation Matrix and vif value of each varibles, we found no correlation over 0.7 and no vif over 5. The variables we chose are significant.
 
