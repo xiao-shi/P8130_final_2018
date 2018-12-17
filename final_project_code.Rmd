@@ -703,8 +703,7 @@ Test MSE is similar to the MSE of our final model, so the predictive ability of 
 
 ```{r}
 var_fit_num = data_vrb_pre_selec %>% 
-  dplyr::select(target_death_rate, incidence_rate, poverty_percent, median_age_female,
-                pct_hs25_over, pct_unemployed16_over, pct_public_coverage, pct_black)
+  dplyr::select(-region)
 
  var_fit_num %>% 
   skimr::skim_to_wide() %>% 
