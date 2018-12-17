@@ -1,6 +1,6 @@
 ---
 title: "final_project_code"
-author: "Catherine"
+author: "Baoyi Shi, Junyuan Zheng, Xiao Shi, Zhiqian Fang"
 date: "12/16/2018"
 output: 
   pdf_document:
@@ -644,7 +644,7 @@ cor_fit = data_vrb_pre_selec %>%
   dplyr::select(target_death_rate, incidence_rate, poverty_percent, median_age_female,
                 pct_hs25_over, pct_unemployed16_over, pct_public_coverage, pct_black)
 
-round(cor(cor_fit),3) %>% knitr::kable()
+round(cor(cor_fit),3) 
 
 vif(fit_with282)
 ```
