@@ -18,6 +18,7 @@ library(HH)
 library(faraway)
 library(caret)
 library(readxl)
+library(reporttools)
 ```
 
 # DATA Preprocessing
@@ -87,6 +88,7 @@ separate(., geography, into = c('county', 'state'), sep = ', ') %>%
 
 
 There are 3 variables that has missing data in the original dataset: 'pct_some_col18_24', 'pct_employed16_over', 'pct_private_coverage_alone'. Since 'pct_no_hs18_24', 'pct_some_col18_24', 'pct_hs18_24', and 'pct_bach_deg18_24' together equals 100, here I re-calculate the 'pct_some_col18_24' variable so that it would not contain missing data anymore.
+
 ```{r}
 data_pre = 
   mutate(data_pre, 
@@ -574,7 +576,7 @@ knitr::kable(tb, caption = "Influential observation")
 
 __Comment__
 
-Consider `DFFITS` and `Cook's Distance`, we found out an influencitial outlier `282`. The difference is large between fitted value with/without `282` observation. Next, we can take a look at the change of fitted value with/without `282`.
+Consider `DFFITS` and `Cook's Distance`, we found out an influenitial outlier `282`. The difference is large between fitted value with/without `282` observation. Next, we can take a look at the change of fitted value with/without `282`.
 
 ```{r}
 without282 = data_vrb_pre_selec[-282,]
@@ -604,10 +606,10 @@ coef9 = (sum1[9]-sum2[9])/sum1[9]*100
 coef10 = (sum1[10]-sum2[10])/sum1[10]*100 
 coef11 = (sum1[11]-sum2[11])/sum1[11]*100
 
-rbind(incidence_rate = coef2, log_poverty_percent = coef3, median_age_female = coef4,
+rbind(incidence_rate = coef2, poverty_percent = coef3, median_age_female = coef4,
       regionNortheast = coef5, regionSouth = coef6, regionWest = coef7, 
-      pct_hs18_24 = coef8, pct_hs25_over = coef9, pct_unemployed16_over = coef10,
-      pct_public_coverage = coef11) 
+      pct_hs25_over = coef8, pct_unemployed16_over = coef9, 
+      pct_public_coverage = coef10, pct_black = coef11) 
 ```
 
 
@@ -615,6 +617,7 @@ __Comment__
 
 After calculating the coefficient changes for each variables, we found that the changes are not significant. We decided to keep the observation `282` in our model. 
 
+## Model Assumption
 
 ```{r fig.height=6}
 fit_with282 = lm(formula = target_death_rate ~ incidence_rate + poverty_percent +
@@ -649,6 +652,10 @@ vif(fit_with282)
 __Comments__
 
 By checking Correlation Matrix and vif value of each varibles, we found no correlation over 0.7 and no vif over 5. The variables we chose are significant.
+
+## Missing Values
+
+There are 3 variables that has missing data in the original dataset: 'pct_some_col18_24', 'pct_employed16_over', 'pct_private_coverage_alone'. We addressed the missing data in our model selection process. We have no missing value in the dataset used for building the model.
 
 # Model Validation
 
@@ -693,3 +700,20 @@ for(i in 1:10){
 ```
 
 Test MSE is similar to the MSE of our final model, so the predictive ability of our model is good.
+
+```{r}
+var_fit_num = data_vrb_pre_selec %>% 
+  dplyr::select(target_death_rate, incidence_rate, poverty_percent, median_age_female,
+                pct_hs25_over, pct_unemployed16_over, pct_public_coverage, pct_black)
+
+ var_fit_num %>% 
+  skimr::skim_to_wide() %>% 
+  dplyr::select(variable, n, mean, sd, p0, p25, p50, p75, p100) %>% 
+  knitr::kable()
+
+var_fit_cat = data_vrb_pre_selec %>% 
+  dplyr::select(region) 
+
+  
+ftable(var_fit_cat) %>% as_tibble() %>% knitr::kable()
+```
